@@ -138,6 +138,82 @@ describe('Parser class', () => {
       expect(structured.first.length).be.equal(3);
       expect(structured.first[2].name).be.equal('brand-gray-3');
     });
+
+    it('should add section params to a property labeled [section-name]-params', () => {
+      const paramList = [
+        { name: 'displayName', value: 'Theme Colors' },
+        { name: 'description', value: 'The colors that define the theme.' },
+      ];
+
+      let content = `$black: #000;
+                     $white: #fff;
+                     //@sass-export-section="theme-colors"
+                     ${paramList.map(p => `//@param ${p.name}="${p.value}"\n'`).join()}
+                        $brand-gray-light: #eceff1;
+                        $brand-gray-medium: #d6d6d6;
+                        $brand-gray: #b0bec5;`;
+      let parser = new Parser(content);
+      let structured = parser.parseStructured();
+
+      const sectionParamName = `theme-colors${Parser.PARAM_SUFFIX}`;
+
+      expect(structured).to.have.property(sectionParamName);
+      for( let param of paramList )
+      {
+        expect(structured[sectionParamName]).to.have.property(param.name);
+        expect(structured[sectionParamName][param.name]).to.be.equal(param.value);
+      }
+    });
+
+    it('should add section params to different sections where applicable', () => {
+      const unusedParamName = 'unusedParams';
+      const paramMap = {
+        colors: [
+          { name: 'displayName', value: 'Theme Colors' },
+          { name: 'description', value: 'The colors that define the theme.' },
+        ],
+        typography: [
+          { name: 'displayName', value: 'Typography' },
+          { name: 'description', value: 'Defines the text and typography of the app.' },
+        ],
+        [unusedParamName]: [
+          { name: 'displayName', value: 'Unused Parameter' },
+        ],
+      };
+
+      const content = `$black: #000;
+                       $white: #fff;
+                       //@sass-export-section="colors"
+                       ${paramMap.colors.map(p => `//@param ${p.name}="${p.value}"\n'`).join()}
+                          $brand-gray-light: #eceff1;
+                          $brand-gray-medium: #d6d6d6;
+                          $brand-gray: #b0bec5;
+                       //@end-sass-export-section
+                       //@sass-export-section="typography"
+                       ${paramMap.typography.map(p => `//@param ${p.name}="${p.value}"\n`).join()}
+                          $typography-size-default: 14px;
+                          $typography-size-header: 24px;
+                       //@end-sass-export-section
+                       ${paramMap.unusedParams.map(p => `//@param ${p.name}="${p.value}"\n`).join()}`;
+      const parser = new Parser(content);
+      const structured = parser.parseStructured();
+
+      for( let paramSet of Object.keys(paramMap) ) {
+        const sectionParamName = `${paramSet}${Parser.PARAM_SUFFIX}`;
+
+        if( paramSet !== unusedParamName ) {
+          expect(structured).to.have.property(sectionParamName);
+
+          for( let param of paramMap[paramSet] ) {
+            expect(structured[sectionParamName]).to.have.property(param.name);
+            expect(structured[sectionParamName][param.name]).to.be.equal(param.value);
+          }
+        }
+        else {
+          expect(structured).not.to.have.property(sectionParamName);
+        }
+      }
+    });
   });
 
   describe('maps support', () => {

@@ -10,12 +10,15 @@ const QUOTES_REPLACE = /^(['"])|(['"])$/g;
 
 const SECTION_TAG = 'sass-export-section';
 const SECTION_PATTERN = `(@${SECTION_TAG}=)(".+")`;
+const SECTION_PARAM_PATTERN = `@param\\s(.+)=['"](.+)['"]`;
 const END_SECTION_PATTERN = `(@end-${SECTION_TAG})`;
 
 const DEFAULT_SECTION = 'variables';
 
 
 export class Parser {
+  public static readonly PARAM_SUFFIX = '-params';
+
   private rawContent: string;
 
   constructor(rawContent: string) {
@@ -45,6 +48,7 @@ export class Parser {
     let matches = this.extractDeclarationsStructured(this.rawContent);
     let currentSection = DEFAULT_SECTION;
     let declarations = {};
+    let paramMap = null;
 
     if (!matches || !matches.length) {
       return {};
@@ -61,7 +65,21 @@ export class Parser {
           declarations[currentSection] = declarations[currentSection] || [];
         }
       } else if (this.checkIsSectionEnd(match)) {
+        this.setParamMap(declarations, paramMap, currentSection);
+
         currentSection = DEFAULT_SECTION;
+      } else if (this.checkIsSectionParam(match)) {
+        if (currentSection === DEFAULT_SECTION)
+          continue;
+        
+        const regexResult = new RegExp(SECTION_PARAM_PATTERN, 'gi').exec(match);
+        const paramName = String(regexResult[1]);
+        const paramValue = String(regexResult[2]);
+
+        if( paramMap )
+          paramMap[paramName] = paramValue;
+        else
+          paramMap = { [paramName]: paramValue };
       } else {
         let parsed = this.parseSingleDeclaration(match);
 
@@ -72,12 +90,14 @@ export class Parser {
       }
     }
 
+    this.setParamMap(declarations, paramMap, currentSection);
+
     return declarations;
   }
 
 
   private extractDeclarationsStructured(content: string): [any] {
-    const matches = content.match(new RegExp(`${DECLARATION_PATTERN}|${SECTION_PATTERN}|${END_SECTION_PATTERN}`, 'g'));
+    const matches = content.match(new RegExp(`${DECLARATION_PATTERN}|${SECTION_PATTERN}|${SECTION_PARAM_PATTERN}|${END_SECTION_PATTERN}`, 'g'));
 
     if (!matches) {
       return [] as any;
@@ -140,12 +160,23 @@ export class Parser {
       });
     }
   }
+
   private checkIsSectionStart(content: string): boolean {
     return (new RegExp(SECTION_PATTERN, 'gi')).test(content);
   }
 
+  private checkIsSectionParam(content: string): boolean {
+    return (new RegExp(SECTION_PARAM_PATTERN, 'gi')).test(content);
+  }
 
   private checkIsSectionEnd(content: string): boolean {
     return (new RegExp(END_SECTION_PATTERN, 'gi')).test(content);
+  }
+
+  private setParamMap(declarations: any, paramMap: any, currentSection: string): void {
+    if( currentSection !== DEFAULT_SECTION && paramMap ) {
+      declarations[`${currentSection}${Parser.PARAM_SUFFIX}`] = Object.assign({}, paramMap);
+      paramMap = null;
+    }
   }
 }
