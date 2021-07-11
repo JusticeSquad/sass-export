@@ -214,6 +214,53 @@ describe('Parser class', () => {
         }
       }
     });
+
+    it('should add meta-data to relevant variables', () => {
+      const metaDataMap = {
+        brandGrayLight: {
+          displayName: "Light Gray - Brand",
+          description: "Brand color for use against dark backgrounds."
+        },
+        brandGray: {
+          displayName: "Gray - Brand",
+          description: "Brand color for use in default cases.",
+        },
+      };
+      const metaDataToVariableMap = {
+        2: 'brandGrayLight',
+        4: 'brandGray',
+      };
+      const metaDataIndexList = Object.keys(metaDataToVariableMap).map(i => +i);
+
+      const content = `$black: #000;
+                       $white: #fff;
+                       $brand-gray-light: #eceff1; //@meta-data ${JSON.stringify(metaDataMap.brandGrayLight)}
+                       $brand-gray-medium: #d6d6d6;
+                       $brand-gray: #b0bec5; //@meta-data ${JSON.stringify(metaDataMap.brandGray)}`;
+      const parser = new Parser(content);
+      const structured = parser.parseStructured();
+
+      expect(structured).to.not.be.null;
+      expect(structured).to.be.an('object');
+      expect(structured).to.have.property('variables');
+      expect(structured.variables.length).be.equal(5);
+
+      for (let i = 0; i < structured.variables.length; ++i) {
+        if (metaDataIndexList.find(n => n === i)) {
+          expect(structured.variables[i]).to.have.property('metaData');
+          
+          expect(metaDataMap).to.have.property(metaDataToVariableMap[i.toString()]);
+          const metaDataExpected = metaDataMap[metaDataToVariableMap[i.toString()]];
+
+          for (let [name, value] of Object.entries(metaDataExpected)) {
+            expect(structured.variables[i].metaData).to.have.property(name);
+            expect(structured.variables[i].metaData[name]).to.be.equal(value);
+          }
+        }
+        else
+          expect(structured.variables[i]).to.not.have.property('metaData');
+      }
+    });
   });
 
   describe('maps support', () => {

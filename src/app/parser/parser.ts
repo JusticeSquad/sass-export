@@ -1,7 +1,10 @@
 const VARIABLE_PATERN = '(?!\\d)[\\w_-][\\w\\d_-]*';
 const VALUE_PATERN = '[^;]+|"(?:[^"]+|(?:\\\\"|[^"])*)"';
+const META_DATA_PATTERN = '\/\/\\s*@meta-data\\s*({.+})';
 const DECLARATION_PATTERN =
   `\\$['"]?(${VARIABLE_PATERN})['"]?\\s*:\\s*(${VALUE_PATERN})(?:\\s*!(global|default)\\s*;|\\s*;(?![^\\{]*\\}))`;
+const DECLARATION_META_DATA_PATTERN =
+  `\\$['"]?(${VARIABLE_PATERN})['"]?\\s*:\\s*(${VALUE_PATERN}).*${META_DATA_PATTERN}`;
 
 const MAP_DECLARATIOM_REGEX = /['"]?((?!\d)[\w_-][\w\d_-]*)['"]?\s*:\s*([a-z\-]+\([^\)]+\)|[^\)\(,\/]+|\([^\)]+\))/gi;
 
@@ -97,7 +100,7 @@ export class Parser {
 
 
   private extractDeclarationsStructured(content: string): [any] {
-    const matches = content.match(new RegExp(`${DECLARATION_PATTERN}|${SECTION_PATTERN}|${SECTION_PARAM_PATTERN}|${END_SECTION_PATTERN}`, 'g'));
+    const matches = content.match(new RegExp(`${DECLARATION_META_DATA_PATTERN}|${DECLARATION_PATTERN}|${SECTION_PATTERN}|${SECTION_PARAM_PATTERN}|${END_SECTION_PATTERN}`, 'g'));
 
     if (!matches) {
       return [] as any;
@@ -144,7 +147,19 @@ export class Parser {
       value = value.replace(QUOTES_REPLACE, '');
     }
 
-    return { name, value } as IDeclaration;
+    let metaDataMatches = matchDeclaration.match(new RegExp(META_DATA_PATTERN));
+    let metaData;
+    try {
+      metaData = JSON.parse(metaDataMatches[1]);
+    }
+    catch(e) {
+      metaData = null;
+    }
+
+    if( metaData )
+      return { name, value, metaData } as IDeclaration;
+    else
+      return { name, value } as IDeclaration;
   }
   private parseMapDeclarations(parsedDeclaration: IDeclaration) {
     let map = this.extractMapDeclarations(parsedDeclaration.value);
