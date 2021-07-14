@@ -139,104 +139,65 @@ describe('Parser class', () => {
       expect(structured.first[2].name).be.equal('brand-gray-3');
     });
 
-    it('should add section params to a property labeled [section-name]-params', () => {
-      const paramList = [
-        { name: 'displayName', value: 'Theme Colors' },
-        { name: 'description', value: 'The colors that define the theme.' },
-      ];
-
+    it(`should add section params to a property labeled [section-name]${Parser.PARAM_SUFFIX}`, () => {
       let content = `$black: #000;
                      $white: #fff;
                      //@sass-export-section="theme-colors"
-                     ${paramList.map(p => `//@param ${p.name}="${p.value}"\n'`).join()}
+                     //@param displayName="Theme Colors"
+                     //@param description="The colors that define the theme."
                         $brand-gray-light: #eceff1;
                         $brand-gray-medium: #d6d6d6;
                         $brand-gray: #b0bec5;`;
       let parser = new Parser(content);
       let structured = parser.parseStructured();
 
-      const sectionParamName = `theme-colors${Parser.PARAM_SUFFIX}`;
-
-      expect(structured).to.have.property(sectionParamName);
-      for( let param of paramList )
-      {
-        expect(structured[sectionParamName]).to.have.property(param.name);
-        expect(structured[sectionParamName][param.name]).to.be.equal(param.value);
-      }
+      expect(structured).to.have.property(`theme-colors${Parser.PARAM_SUFFIX}`);
+      expect(structured[`theme-colors${Parser.PARAM_SUFFIX}`]).to.have.property('displayName');
+      expect(structured[`theme-colors${Parser.PARAM_SUFFIX}`].displayName).to.be.equal('Theme Colors');
+      expect(structured[`theme-colors${Parser.PARAM_SUFFIX}`]).to.have.property('description');
+      expect(structured[`theme-colors${Parser.PARAM_SUFFIX}`].description).to.be.equal('The colors that define the theme.');
     });
 
     it('should add section params to different sections where applicable', () => {
-      const unusedParamName = 'unusedParams';
-      const paramMap = {
-        colors: [
-          { name: 'displayName', value: 'Theme Colors' },
-          { name: 'description', value: 'The colors that define the theme.' },
-        ],
-        typography: [
-          { name: 'displayName', value: 'Typography' },
-          { name: 'description', value: 'Defines the text and typography of the app.' },
-        ],
-        [unusedParamName]: [
-          { name: 'displayName', value: 'Unused Parameter' },
-        ],
-      };
-
       const content = `$black: #000;
                        $white: #fff;
                        //@sass-export-section="colors"
-                       ${paramMap.colors.map(p => `//@param ${p.name}="${p.value}"\n'`).join()}
+                       //@param displayName="Theme Colors"
+                       //@param description="The colors that define the theme."
                           $brand-gray-light: #eceff1;
                           $brand-gray-medium: #d6d6d6;
                           $brand-gray: #b0bec5;
                        //@end-sass-export-section
                        //@sass-export-section="typography"
-                       ${paramMap.typography.map(p => `//@param ${p.name}="${p.value}"\n`).join()}
+                       //@param displayName="Typography"
+                       //@param description="Defines the text and typography of the app."
                           $typography-size-default: 14px;
                           $typography-size-header: 24px;
                        //@end-sass-export-section
-                       ${paramMap.unusedParams.map(p => `//@param ${p.name}="${p.value}"\n`).join()}`;
+                       //@param unused="Unused Parameter."`;
       const parser = new Parser(content);
       const structured = parser.parseStructured();
 
-      for( let paramSet of Object.keys(paramMap) ) {
-        const sectionParamName = `${paramSet}${Parser.PARAM_SUFFIX}`;
-
-        if( paramSet !== unusedParamName ) {
-          expect(structured).to.have.property(sectionParamName);
-
-          for( let param of paramMap[paramSet] ) {
-            expect(structured[sectionParamName]).to.have.property(param.name);
-            expect(structured[sectionParamName][param.name]).to.be.equal(param.value);
-          }
-        }
-        else {
-          expect(structured).not.to.have.property(sectionParamName);
-        }
-      }
+      expect(structured).to.have.property(`colors${Parser.PARAM_SUFFIX}`);
+      expect(structured[`colors${Parser.PARAM_SUFFIX}`]).to.have.property('displayName');
+      expect(structured[`colors${Parser.PARAM_SUFFIX}`].displayName).to.be.equal('Theme Colors');
+      expect(structured[`colors${Parser.PARAM_SUFFIX}`]).to.have.property('description');
+      expect(structured[`colors${Parser.PARAM_SUFFIX}`].description).to.be.equal('The colors that define the theme.');
+      expect(structured[`colors${Parser.PARAM_SUFFIX}`]).not.to.have.property('unused');
+      expect(structured).to.have.property(`typography${Parser.PARAM_SUFFIX}`);
+      expect(structured[`typography${Parser.PARAM_SUFFIX}`]).to.have.property('displayName');
+      expect(structured[`typography${Parser.PARAM_SUFFIX}`].displayName).to.be.equal('Typography');
+      expect(structured[`typography${Parser.PARAM_SUFFIX}`]).to.have.property('description');
+      expect(structured[`typography${Parser.PARAM_SUFFIX}`].description).to.be.equal('Defines the text and typography of the app.');
+      expect(structured[`typography${Parser.PARAM_SUFFIX}`]).not.to.have.property('unused');
     });
 
     it('should add meta-data to relevant variables', () => {
-      const metaDataMap = {
-        brandGrayLight: {
-          displayName: "Light Gray - Brand",
-          description: "Brand color for use against dark backgrounds."
-        },
-        brandGray: {
-          displayName: "Gray - Brand",
-          description: "Brand color for use in default cases.",
-        },
-      };
-      const metaDataToVariableMap = {
-        2: 'brandGrayLight',
-        4: 'brandGray',
-      };
-      const metaDataIndexList = Object.keys(metaDataToVariableMap).map(i => +i);
-
       const content = `$black: #000;
                        $white: #fff;
-                       $brand-gray-light: #eceff1; //@meta-data ${JSON.stringify(metaDataMap.brandGrayLight)}
+                       $brand-gray-light: #eceff1; // @meta-data { "displayName": "Light Gray - Brand", "description": "Brand color for use against dark backgrounds." }
                        $brand-gray-medium: #d6d6d6;
-                       $brand-gray: #b0bec5; //@meta-data ${JSON.stringify(metaDataMap.brandGray)}`;
+                       $brand-gray: #b0bec5; //@meta-data { "displayName": "Gray - Brand", "description": "Brand color for use in default cases." }`;
       const parser = new Parser(content);
       const structured = parser.parseStructured();
 
@@ -245,21 +206,21 @@ describe('Parser class', () => {
       expect(structured).to.have.property('variables');
       expect(structured.variables.length).be.equal(5);
 
-      for (let i = 0; i < structured.variables.length; ++i) {
-        if (metaDataIndexList.find(n => n === i)) {
-          expect(structured.variables[i]).to.have.property('metaData');
-          
-          expect(metaDataMap).to.have.property(metaDataToVariableMap[i.toString()]);
-          const metaDataExpected = metaDataMap[metaDataToVariableMap[i.toString()]];
+      expect(structured.variables[0]).to.not.have.property('metaData');
+      expect(structured.variables[1]).to.not.have.property('metaData');
+      expect(structured.variables[3]).to.not.have.property('metaData');
 
-          for (let [name, value] of Object.entries(metaDataExpected)) {
-            expect(structured.variables[i].metaData).to.have.property(name);
-            expect(structured.variables[i].metaData[name]).to.be.equal(value);
-          }
-        }
-        else
-          expect(structured.variables[i]).to.not.have.property('metaData');
-      }
+      expect(structured.variables[2]).to.have.property('metaData');
+      expect(structured.variables[2].metaData).to.have.property('displayName');
+      expect(structured.variables[2].metaData.displayName).to.be.equal('Light Gray - Brand');
+      expect(structured.variables[2].metaData).to.have.property('description');
+      expect(structured.variables[2].metaData.description).to.be.equal('Brand color for use against dark backgrounds.');
+
+      expect(structured.variables[4]).to.have.property('metaData');
+      expect(structured.variables[4].metaData).to.have.property('displayName');
+      expect(structured.variables[4].metaData.displayName).to.be.equal('Gray - Brand');
+      expect(structured.variables[4].metaData).to.have.property('description');
+      expect(structured.variables[4].metaData.description).to.be.equal('Brand color for use in default cases.');
     });
   });
 
