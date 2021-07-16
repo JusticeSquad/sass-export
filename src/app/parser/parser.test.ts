@@ -195,9 +195,24 @@ describe('Parser class', () => {
     it('should add meta-data to relevant variables', () => {
       const content = `$black: #000;
                        $white: #fff;
-                       $brand-gray-light: #eceff1; // @meta-data { "displayName": "Light Gray - Brand", "description": "Brand color for use against dark backgrounds." }
+
+                       /**
+                        * @meta-data displayName="Light Gray - Brand"
+                        * @meta-data description="Brand color for use against dark backgrounds."
+                        **/
+                       $brand-gray-light: #eceff1;
+
                        $brand-gray-medium: #d6d6d6;
-                       $brand-gray: #b0bec5; //@meta-data { "displayName": "Gray - Brand", "description": "Brand color for use in default cases." }`;
+
+                       /**
+                        * @meta-data displayName="Gray - Brand"
+                        * @meta-data description="Brand color for use in default cases."
+                        **/
+                       $brand-gray: #b0bec5;
+                       
+                       /**
+                        * @meta-data unused="nothing"
+                        **/`;
       const parser = new Parser(content);
       const structured = parser.parseStructured();
 

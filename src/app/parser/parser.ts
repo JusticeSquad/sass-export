@@ -1,10 +1,11 @@
 const VARIABLE_PATERN = '(?!\\d)[\\w_-][\\w\\d_-]*';
 const VALUE_PATERN = '[^;]+|"(?:[^"]+|(?:\\\\"|[^"])*)"';
-const META_DATA_PATTERN = '\/\/\\s*@meta-data\\s*({.+})';
+const META_DATA_PATTERN_PARAM = '@meta-data\\s*(.+)';
+const META_DATA_EXTRACTION_PATTERN = `@meta-data\\s*(.+)=['"](.+)['"]`;
+const META_DATA_PATTERN_FULL = `\\/\\*\\*\\s*(?:\\s*\\*\\s*${META_DATA_PATTERN_PARAM})*\\s*\\*\\*\\/`;
 const DECLARATION_PATTERN =
   `\\$['"]?(${VARIABLE_PATERN})['"]?\\s*:\\s*(${VALUE_PATERN})(?:\\s*!(global|default)\\s*;|\\s*;(?![^\\{]*\\}))`;
-const DECLARATION_META_DATA_PATTERN =
-  `\\$['"]?(${VARIABLE_PATERN})['"]?\\s*:\\s*(${VALUE_PATERN}).*${META_DATA_PATTERN}`;
+const DECLARATION_META_DATA_PATTERN = `${META_DATA_PATTERN_FULL}\\s*${DECLARATION_PATTERN}`;
 
 const MAP_DECLARATIOM_REGEX = /['"]?((?!\d)[\w_-][\w\d_-]*)['"]?\s*:\s*([a-z\-]+\([^\)]+\)|[^\)\(,\/]+|\([^\)]+\))/gi;
 
@@ -52,6 +53,7 @@ export class Parser {
     let currentSection = DEFAULT_SECTION;
     let declarations = {};
     let paramMap = null;
+    let metaData = null;
 
     if (!matches || !matches.length) {
       return {};
@@ -84,10 +86,31 @@ export class Parser {
         else
           paramMap = { [paramName]: paramValue };
       } else {
+        if (this.checkIsMetaData(match)) {
+          const metaDataList = match.match(new RegExp(META_DATA_PATTERN_PARAM, 'gi'));
+          for (let m of metaDataList) {
+            const regexResult = new RegExp(META_DATA_EXTRACTION_PATTERN, 'gi').exec(m);
+  
+            if (regexResult.length !== 3)
+              continue;
+  
+            if (!metaData)
+              metaData = {};
+  
+            metaData[regexResult[1]] = regexResult[2];
+          }
+        }
+
         let parsed = this.parseSingleDeclaration(match);
 
         if (parsed) {
           this.parseMapDeclarations(parsed);
+
+          if (metaData) {
+            parsed.metaData = metaData;
+            metaData = null;
+          }
+
           declarations[currentSection].push(parsed);
         }
       }
@@ -147,19 +170,7 @@ export class Parser {
       value = value.replace(QUOTES_REPLACE, '');
     }
 
-    let metaDataMatches = matchDeclaration.match(new RegExp(META_DATA_PATTERN));
-    let metaData;
-    try {
-      metaData = JSON.parse(metaDataMatches[1]);
-    }
-    catch(e) {
-      metaData = null;
-    }
-
-    if( metaData )
-      return { name, value, metaData } as IDeclaration;
-    else
-      return { name, value } as IDeclaration;
+    return { name, value } as IDeclaration;
   }
   private parseMapDeclarations(parsedDeclaration: IDeclaration) {
     let map = this.extractMapDeclarations(parsedDeclaration.value);
@@ -186,6 +197,10 @@ export class Parser {
 
   private checkIsSectionEnd(content: string): boolean {
     return (new RegExp(END_SECTION_PATTERN, 'gi')).test(content);
+  }
+
+  private checkIsMetaData(content: string): boolean {
+    return (new RegExp(META_DATA_PATTERN_PARAM, 'gi')).test(content);
   }
 
   private setParamMap(declarations: any, paramMap: any, currentSection: string): void {
